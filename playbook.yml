@@ -1,0 +1,104 @@
+---
+- hosts: all
+  become: true
+  tasks:
+
+# Install NGINX
+
+  - name: "Installing NGINX"
+    ansible.builtin.apt:
+      name: "nginx"
+      state: "latest"
+      update_cache: true
+
+  - name: "Delete folder var/www/html"
+    ansible.builtin.file:
+      path: "/var/www/html"
+      state: "absent"
+
+  - name: "Copy site"
+    ansible.builtin.copy:
+      src: "files/html"
+      dest: "/var/www/"
+      owner: "ansible"
+      group: "ansible"
+      mode: "0644"
+
+# Install MYSQL
+  
+  - name: "Install mysql"
+    ansible.builtin.apt:
+      name: "mysql-server"
+      state: "latest"
+      update_cache: true
+
+  - name: "Install pip 3"
+    ansible.builtin.apt:
+      name: "python3-pip"
+      state: "present"
+  - name: "Install pymysql"
+    pip:
+      name: "pymysql"
+      state: "present"      
+  
+  - name: "Set up root user"
+    community.mysql.mysql_user:
+      name: "root"
+      password: "p@ssw0rd"
+      login_user: "root"
+      login_password: "p@ssw0rd"
+      check_implicit_admin: true
+      login_unix_socket: "/var/run/mysqld/mysqld.sock"
+  
+  - name: "Delete aninymous users"
+    community.mysql.mysql_user:
+      name: "" 
+      state: "absent"
+      login_user: "root"
+      login_password: "p@ssw0rd"
+   
+  - name: "Delete test user"
+    community.mysql.mysql_db:
+      name: "test"
+      state: "absent"
+      login_user: "root"
+      login_password: "p@ssw0rd"
+                 
+ 
+# Inastall PHP
+  
+  - name: "Install php-fpm annd php mysql"
+    ansible.builtin.apt:
+       name: "{{ item }}"
+       state: "latest"
+       update_cache: true
+    with_items:
+       - "php-fpm"
+       - "php-mysql"
+  
+  - name: "Copy php files to /var/www"
+    ansible.builtin.copy:
+      src: "files/test-php/php_test"
+      dest: "/var/www/"
+      owner: "ansible"
+      group: "ansible" 
+      mode: "0644"
+  
+  - name: "Copy NGING config for php"
+    ansible.builtin.copy:
+      src: "files/test-php/nginx.conf"
+      dest: "/etc/nginx/sites-available/php_test.conf"
+      owner: "ansible"
+      group: "ansible"
+      mode: "0644" 
+
+  - name: "Link"
+    ansible.builtin.file:
+      src: "/etc/nginx/sites-available/php_test.conf" 
+      dest: "/etc/nginx/sites-enabled/php_test"
+      state: "link"
+
+  - name: "Reload nginx"
+    ansible.builtin.service:
+      name: "nginx"
+      state: "reloaded"
